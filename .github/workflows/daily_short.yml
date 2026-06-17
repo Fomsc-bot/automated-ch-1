@@ -1,0 +1,87 @@
+name: Daily Automated YouTube Shorts Upload
+
+on:
+  schedule:
+    # Run every day at 13:00 UTC (9:00 AM EST, 6:30 PM IST)
+    - cron: '0 13 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (generate assets but skip uploading)'
+        required: true
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-upload:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install System Dependencies (FFmpeg & fonts)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-montserrat
+
+      - name: Install Python dependencies
+          # Cache packages to speed up daily execution
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Create required folders
+        run: |
+          mkdir -p output logs assets/music assets/fonts assets/brand assets/templates
+
+      - name: Copy System font if Montserrat not cached in assets
+        run: |
+          # Copy system installed Montserrat font to asset folder so pipeline loads it
+          if [ -f "/usr/share/fonts/truetype/montserrat/Montserrat-Bold.ttf" ]; then
+            cp /usr/share/fonts/truetype/montserrat/Montserrat-Bold.ttf assets/fonts/
+          fi
+
+      - name: Execute Automation Pipeline
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          TTS_PROVIDER: "google"
+          UPLOAD_VIDEO: "true"
+          DRY_RUN: ${{ inputs.dry_run || 'false' }}
+        run: |
+          python run_pipeline.py
+
+      - name: Commit updated used topics and logs
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add topics/used_topics.json logs/upload_log.json
+          git diff-index --quiet HEAD || git commit -m "Auto-update topic usage status and upload logs [skip ci]"
+          git push
+
+      - name: Upload Build Artifacts for Debugging
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-assets
+          path: |
+            output/
+          retention-days: 7
