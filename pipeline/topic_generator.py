@@ -9,11 +9,10 @@ import random
 import logging
 from datetime import date
 from pathlib import Path
-from openai import OpenAI
+import requests
 
 from pipeline.config import (
-    TOPIC_POOL_FILE, USED_TOPICS_FILE,
-    OPENAI_MODEL, OPENAI_TEMPERATURE
+    TOPIC_POOL_FILE, USED_TOPICS_FILE
 )
 
 logger = logging.getLogger(__name__)
@@ -32,9 +31,14 @@ def _save_json(path: Path, data: dict | list) -> None:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
-def _generate_topic_via_gpt(client: OpenAI) -> dict:
-    """Fallback: ask GPT-4o to invent a fresh topic when the pool is exhausted."""
-    logger.info("Topic pool exhausted — generating new topic via GPT-4o")
+def _generate_topic_via_gemini() -> dict:
+    """Fallback: ask Gemini to invent a fresh topic when the pool is exhausted."""
+    logger.info("Topic pool exhausted — generating new topic via Gemini")
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise EnvironmentError("GEMINI_API_KEY environment variable is missing.")
+
     prompt = (
         "Generate ONE unique, highly shareable YouTube Shorts topic about using an AI tool "
         "(ChatGPT, Gemini, Claude, Perplexity, Midjourney, GitHub Copilot, etc.) to solve "
@@ -42,18 +46,32 @@ def _generate_topic_via_gpt(client: OpenAI) -> dict:
         "topic (string, ≤12 words), ai_tool (string), category (string), variant (A|B|C). "
         "Make it specific, punchy, and actionable. Return only the JSON object."
     )
-    response = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        temperature=OPENAI_TEMPERATURE,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": "You are an expert YouTube content strategist specialising in AI productivity content."},
-            {"role": "user",   "content": prompt},
-        ],
-    )
-    data = json.loads(response.choices[0].message.content)
-    data["id"] = f"gpt-{date.today().isoformat()}"
+    
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
+    
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code != 200:
+        raise RuntimeError(f"Gemini API error ({response.status_code}): {response.text}")
+        
+    resp_json = response.json()
+    try:
+        raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError):
+        raise RuntimeError(f"Failed to parse Gemini topic response: {resp_json}")
+        
+    data = json.loads(raw_text)
+    data["id"] = f"gemini-{date.today().isoformat()}"
     return data
+
 
 
 def get_next_topic() -> dict:
@@ -86,8 +104,7 @@ def get_next_topic() -> dict:
         least_used = [t for t in available if t["category"] not in used_categories[-5:]]
         topic = random.choice(least_used if least_used else available)
     else:
-        client = OpenAI()
-        topic = _generate_topic_via_gpt(client)
+        topic = _generate_topic_via_gemini()
 
     # Update state
     used_ids.add(str(topic["id"]))

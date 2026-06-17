@@ -3,18 +3,18 @@
 [![Test Rendering Pipeline](https://github.com/your-username/ai-lifehacks-channel/actions/workflows/test_pipeline.yml/badge.svg)](https://github.com/your-username/ai-lifehacks-channel/actions/workflows/test_pipeline.yml)
 [![Daily Upload Status](https://github.com/your-username/ai-lifehacks-channel/actions/workflows/daily_short.yml/badge.svg)](https://github.com/your-username/ai-lifehacks-channel/actions/workflows/daily_short.yml)
 
-A fully automated, zero-human-intervention content creation engine that generates, renders, and publishes daily YouTube Shorts focused on "AI and Productivity Life Hacks". Built with Python, MoviePy, Pillow, OpenAI GPT-4o, and Google Cloud TTS, orchestrated via GitHub Actions.
+A fully automated, zero-human-intervention content creation engine that generates, renders, and publishes daily YouTube Shorts focused on "AI and Productivity Life Hacks". Built with Python, MoviePy, Pillow, Google Gemini, and Google Cloud TTS, orchestrated via GitHub Actions.
 
 ---
 
 ## 🌟 Key Features
 
-- **Automated Topic Rotation**: Selects and rotates topics from a curated pool of 75+ productivity scenarios. Falls back to GPT-4o to generate fresh concepts.
+- **Automated Topic Rotation**: Selects and rotates topics from a curated pool of 75+ productivity scenarios. Falls back to Gemini to generate fresh concepts.
 - **AI-Powered Copywriting**: Crafts high-retention, punchy narration scripts (≤145 words) in three distinct hook variants (Story, List-style, Authoritative) alongside SEO-optimized titles, descriptions, and tags.
 - **No-Dependency Subtitling**: Renders customizable subtitles word-by-word synced to the voiceover, bypassing any need for complex local ImageMagick installations.
 - **High-CTR Thumbnails**: pillow programmatically builds clean 1280x720 JPEG templates complete with high-contrast text outlines, custom gradients, and brand markers.
 - **Headless YouTube Integration**: Secure OAuth2 refresh token pipeline uploads the video, updates metadata, binds captions, and sets the thumbnail automatically.
-- **Zero Running Costs**: Leveraging GitHub Actions' free tiers and Google Cloud TTS's 1M characters/month free allowance allows the entire system to run for ~$2–5/month (mostly API costs for GPT-4o).
+- **Zero Running Costs**: Leveraging GitHub Actions' free tiers, Google Cloud TTS's 1M characters/month free allowance, and the Gemini API Free Tier allows the entire system to run for **$0/month**.
 
 ---
 
@@ -27,7 +27,7 @@ A fully automated, zero-human-intervention content creation engine that generate
 ├── pipeline/
 │   ├── config.py                # Tuning parameters (visuals, colors, TTS, BGM volume)
 │   ├── topic_generator.py       # Tracks used topics & manages pool
-│   ├── script_writer.py         # Interfaces with OpenAI ChatCompletions (GPT-4o-mini)
+│   ├── script_writer.py         # Interfaces with Google Gemini API (1.5-flash)
 │   ├── tts_engine.py            # Converts scripts to audio (WaveNet / ElevenLabs)
 │   ├── subtitle_writer.py       # Parses narration to SRT with proportional timing
 │   ├── video_builder.py         # Assembles background, audio, BGM, and Pillow captions
@@ -60,9 +60,9 @@ If you want to test the video rendering engine on your local machine:
    ```bash
    pip install -r requirements.txt
    ```
-3. Set your OpenAI key:
+3. Set your Gemini API key:
    ```bash
-   export OPENAI_API_KEY="your-key"
+   export GEMINI_API_KEY="your-key"
    ```
 4. Perform a dry run test (this will render the video to `/output` but skip uploading):
    ```bash

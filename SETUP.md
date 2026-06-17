@@ -65,7 +65,7 @@ Since GitHub Actions runs headlessly, we must authenticate once locally to gener
 | `YOUTUBE_CLIENT_ID` | From console output or `client_id` inside `token.json` |
 | `YOUTUBE_CLIENT_SECRET` | From console output or `client_secret` inside `token.json` |
 | `YOUTUBE_REFRESH_TOKEN` | From console output or `refresh_token` inside `token.json` |
-| `OPENAI_API_KEY` | Create a key at [platform.openai.com](https://platform.openai.com) |
+| `GEMINI_API_KEY` | Create a free key at [aistudio.google.com](https://aistudio.google.com/) (Free Tier, no credit card required) |
 | `ELEVENLABS_API_KEY` | *(Optional)* From profile page on [elevenlabs.io](https://elevenlabs.io) |
 
 ---

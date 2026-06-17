@@ -13,12 +13,13 @@ Output dict keys:
   variant         - A | B | C
 """
 
+import os
 import json
 import logging
-from openai import OpenAI
+import requests
 
 from pipeline.config import (
-    OPENAI_MODEL, OPENAI_TEMPERATURE, SCRIPT_MAX_WORDS, YT_SHORTS_TAG
+    YT_SHORTS_TAG, SCRIPT_MAX_WORDS
 )
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,8 @@ def _build_user_prompt(topic: dict) -> str:
     ai_tool = topic.get("ai_tool", "ChatGPT")
 
     return f"""
+{SYSTEM_PROMPT}
+
 Write a complete YouTube Shorts script package for this topic:
 TOPIC: "{topic['topic']}"
 AI TOOL FEATURED: {ai_tool}
@@ -80,38 +83,44 @@ Return a JSON object with these exact keys:
 
 def generate_script(topic: dict) -> dict:
     """
-    Generates the complete script + metadata package for one video.
-
-    Args:
-        topic: dict from topic_generator.get_next_topic()
-
-    Returns:
-        dict with keys: narration, scenes, title, description, tags,
-                        thumbnail_text, hook, variant
+    Generates the complete script + metadata package for one video using Gemini API (Free Tier).
     """
-    client = OpenAI()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    if not api_key:
+        raise EnvironmentError("GEMINI_API_KEY environment variable is missing.")
+
     prompt = _build_user_prompt(topic)
+    logger.info(f"Generating script for: {topic['topic']} (variant {topic.get('variant','A')}) via Gemini Free Tier")
 
-    logger.info(f"Generating script for: {topic['topic']} (variant {topic.get('variant','A')})")
+    # API call to Gemini 1.5 Flash using requests
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key}"
+    headers = {"Content-Type": "application/json"}
+    payload = {
+        "contents": [{
+            "parts": [{"text": prompt}]
+        }],
+        "generationConfig": {
+            "responseMimeType": "application/json"
+        }
+    }
 
-    response = client.chat.completions.create(
-        model=OPENAI_MODEL,
-        temperature=OPENAI_TEMPERATURE,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user",   "content": prompt},
-        ],
-    )
+    response = requests.post(url, headers=headers, json=payload)
+    if response.status_code != 200:
+        raise RuntimeError(f"Gemini API error ({response.status_code}): {response.text}")
 
-    raw = response.choices[0].message.content
-    script = json.loads(raw)
+    resp_json = response.json()
+    try:
+        raw_text = resp_json["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError) as e:
+        raise RuntimeError(f"Failed to parse Gemini API response structure. Response: {resp_json}")
+
+    script = json.loads(raw_text)
 
     # Validate required keys
     required = {"narration", "scenes", "title", "description", "tags", "thumbnail_text", "hook", "variant"}
     missing  = required - set(script.keys())
     if missing:
-        raise ValueError(f"GPT response missing keys: {missing}\nRaw: {raw}")
+        raise ValueError(f"Gemini response missing keys: {missing}\nRaw: {raw_text}")
 
     # Enforce title length
     if len(script["title"]) > 100:
@@ -121,6 +130,7 @@ def generate_script(topic: dict) -> dict:
     logger.info(f"Narration word count: {len(script['narration'].split())}")
 
     return script
+
 
 
 if __name__ == "__main__":

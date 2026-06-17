@@ -42,7 +42,7 @@ jobs:
 
       - name: Execute Test Run
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
           TTS_PROVIDER: "google"
           UPLOAD_VIDEO: "false"
